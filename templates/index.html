@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pose Estimation App</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <h1>Pose Estimation Exercise Selector</h1>
+    <form action="/video_feed" method="get">
+        <label for="exercise">Select Exercise:</label>
+        <select id="exercise" name="exercise">
+            <option value="squat">Squat</option>
+            <option value="pushup">Push Up</option>
+            <option value="benchpress">Bench Press</option>
+            <option value="dips">Dips</option>
+            <option value="pullup">Pull Up</option>
+            <option value="crunches">Crunches</option>
+        </select>
+        <button type="submit">Start Exercise</button>
+    </form>
+    <br>
+    <h2>Live Video Feed:</h2>
+    <img src="{{ url_for('video_feed') }}" width="640" height="480" id="video-feed">
+</body>
+</html>

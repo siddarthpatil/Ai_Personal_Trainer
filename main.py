@@ -1,60 +1,81 @@
+from flask import Flask, render_template, request, Response
 import cv2
+import numpy as np
 import mediapipe as mp
-from exercises import detect_squat, detect_push_up, detect_bench_press, detect_dips, detect_pull_up, detect_crunches
-from utils import draw_landmarks, display_feedback
+from exercises.squat import detect_squat
+from exercises.push_up import detect_push_up
+from exercises.bench_press import detect_bench_press
+from exercises.dips import detect_dips
+from exercises.pull_up import detect_pull_up
+from exercises.crunches import detect_crunches
+from utils.angle_calculation import calculate_angle
+from utils.visualization import draw_landmarks, draw_feedback, draw_angle
+
+app = Flask(__name__)
 
 # Initialize MediaPipe Pose
 mp_pose = mp.solutions.pose
 pose = mp_pose.Pose()
 
-# Initialize MediaPipe Drawing Utils
-mp_drawing = mp.solutions.drawing_utils
-
-# Start video capture
-cap = cv2.VideoCapture(0)
-
-while cap.isOpened():
-    ret, frame = cap.read()
-    if not ret:
-        break
-
-    # Convert the image to RGB
+def detect_exercise(frame, exercise):
     image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     results = pose.process(image_rgb)
 
-    # Check if pose landmarks are detected
     if results.pose_landmarks:
         landmarks = results.pose_landmarks.landmark
+        feedback, angle = None, None
 
-        # Detect and provide feedback for different exercises
-        feedback_squat, angle_squat = detect_squat(landmarks, mp_pose)
-        display_feedback(frame, f'Squat: {feedback_squat} | Angle: {angle_squat}', position=(10, 50))
-        
-        feedback_push_up, angle_push_up = detect_push_up(landmarks, mp_pose)
-        display_feedback(frame, f'Push-Up: {feedback_push_up} | Angle: {angle_push_up}', position=(10, 100))
-        
-        feedback_bench_press, angle_bench_press = detect_bench_press(landmarks, mp_pose)
-        display_feedback(frame, f'Bench Press: {feedback_bench_press} | Angle: {angle_bench_press}', position=(10, 150))
-        
-        feedback_dips, angle_dips = detect_dips(landmarks, mp_pose)
-        display_feedback(frame, f'Dips: {feedback_dips} | Angle: {angle_dips}', position=(10, 200))
-        
-        feedback_pull_up, angle_pull_up = detect_pull_up(landmarks, mp_pose)
-        display_feedback(frame, f'Pull-Up: {feedback_pull_up} | Angle: {angle_pull_up}', position=(10, 250))
-        
-        feedback_crunches, angle_crunches = detect_crunches(landmarks, mp_pose)
-        display_feedback(frame, f'Crunches: {feedback_crunches} | Angle: {angle_crunches}', position=(10, 300))
+        if exercise == 'squat':
+            feedback, angle = detect_squat(landmarks, mp_pose)
+        elif exercise == 'pushup':
+            feedback, angle = detect_push_up(landmarks, mp_pose)
+        elif exercise == 'benchpress':
+            feedback, angle = detect_bench_press(landmarks, mp_pose)
+        elif exercise == 'dips':
+            feedback, angle = detect_dips(landmarks, mp_pose)
+        elif exercise == 'pullup':
+            feedback, angle = detect_pull_up(landmarks, mp_pose)
+        elif exercise == 'crunches':
+            feedback, angle = detect_crunches(landmarks, mp_pose)
 
-        # Draw landmarks and connections
-        draw_landmarks(frame, results.pose_landmarks, mp_pose)
+        return feedback, angle, results
+
+    return None, None, None
+
+def generate_frames(exercise):
+    cap = cv2.VideoCapture(0)
     
-    # Display the resulting frame
-    cv2.imshow('Pose Estimation', frame)
-    
-    # Exit on 'q' key press
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
+    while True:
+        success, frame = cap.read()
+        if not success:
+            break
 
-# Release video capture and destroy windows
-cap.release()
-cv2.destroyAllWindows()
+        feedback, angle, results = detect_exercise(frame, exercise)
+        frame = draw_landmarks(frame, results)
+        if angle:
+            # Specify the position where you want to display the angle
+            position = [0.5, 0.5]  # Example position (relative coordinates)
+            frame = draw_angle(frame, angle, position)
+        frame = draw_feedback(frame, feedback)
+
+        # Encode frame as JPEG
+        ret, buffer = cv2.imencode('.jpg', frame)
+        frame = buffer.tobytes()
+        
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+    
+    cap.release()
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/video_feed')
+def video_feed():
+    exercise = request.args.get('exercise', 'squat')  # Default to 'squat'
+    return Response(generate_frames(exercise),
+                    mimetype='multipart/x-mixed-replace; boundary=frame')
+
+if __name__ == '__main__':
+    app.run(debug=True)
