@@ -1,7 +1,3 @@
-Here's the complete `README.md` that you can copy and paste directly:
-
----
-
 # Pose Estimation Web App
 
 This project is a pose estimation application built using OpenCV and MediaPipe, designed to help users check their form while performing common gym exercises such as squats, push-ups, bench press, dips, pull-ups, and crunches. The application has been extended into a web app using Flask, allowing users to select exercises and receive real-time feedback on their form directly in their browser.
